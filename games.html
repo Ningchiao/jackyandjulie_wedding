@@ -179,4 +179,168 @@
         let gameDuration = 60;
         let timerId;
 
-        const startScreen = document.getElementById('start-screen
+        const startScreen = document.getElementById('start-screen');
+        const teamSelection = document.getElementById('team-selection');
+        const gameScreen = document.getElementById('game-screen');
+        const endScreen = document.getElementById('end-screen');
+        const teamNameDisplay = document.getElementById('team-name');
+        const timerDisplay = document.getElementById('timer');
+        const broccoliContainer = document.getElementById('broccoli-container');
+        const restartButton = document.getElementById('restart-button');
+        const winnerMessage = document.getElementById('winner-message');
+
+        const teams = {
+            TeamA: '新郎隊',
+            TeamB: '新娘隊',
+            TeamC: '同學同事隊',
+            TeamD: '親友隊'
+        };
+
+        const signIn = async () => {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Firebase Auth failed:", error);
+            }
+        };
+
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("Signed in anonymously with user ID:", userId);
+                setupFirestoreListener();
+            } else {
+                await signIn();
+            }
+        });
+
+        const setupFirestoreListener = () => {
+            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const scores = docSnap.data();
+                    updateScores(scores);
+                    if (scores.gameActive === false && gameActive) {
+                        endGame(scores);
+                    }
+                } else {
+                    setDoc(docRef, {
+                        TeamA: 0,
+                        TeamB: 0,
+                        TeamC: 0,
+                        TeamD: 0,
+                        gameActive: false,
+                        lastReset: Date.now()
+                    });
+                }
+            }, (error) => console.error("Firestore listener error:", error));
+        };
+
+        const updateScores = (scores) => {
+            for (const teamId in teams) {
+                if (scores.hasOwnProperty(teamId)) {
+                    document.getElementById(`score-${teamId}`).innerText = scores[teamId];
+                }
+            }
+        };
+
+        const startTimer = () => {
+            let timeLeft = gameDuration;
+            timerDisplay.innerText = timeLeft;
+            gameActive = true;
+            timerId = setInterval(() => {
+                timeLeft--;
+                timerDisplay.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerId);
+                    gameActive = false;
+                    updateGameState(false);
+                }
+            }, 1000);
+        };
+
+        const updateGameState = async (active) => {
+            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
+            try {
+                await updateDoc(docRef, { gameActive: active });
+            } catch (error) {
+                console.error("Error updating game state:", error);
+            }
+        };
+
+        teamSelection.addEventListener('click', (event) => {
+            if (event.target.tagName === 'BUTTON') {
+                selectedTeam = event.target.dataset.team;
+                teamNameDisplay.innerText = `${teams[selectedTeam]}：你的隊伍`;
+                startScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                
+                if (!gameActive) {
+                    startTimer();
+                    updateGameState(true);
+                }
+            }
+        });
+
+        broccoliContainer.addEventListener('click', async (event) => {
+            if (!gameActive || !selectedTeam) return;
+
+            const broccoliIcon = document.getElementById('broccoli-icon');
+            broccoliIcon.style.animation = 'none';
+            void broccoliIcon.offsetWidth;
+            broccoliIcon.style.animation = 'bounce 0.5s ease-in-out';
+
+            const bubble = document.createElement('div');
+            bubble.classList.add('score-bubble');
+            bubble.innerText = '+1';
+            bubble.style.left = `${event.clientX - broccoliContainer.getBoundingClientRect().left}px`;
+            bubble.style.top = `${event.clientY - broccoliContainer.getBoundingClientRect().top}px`;
+            broccoliContainer.appendChild(bubble);
+
+            setTimeout(() => bubble.remove(), 1000);
+
+            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
+            try {
+                await updateDoc(docRef, { [selectedTeam]: increment(1) });
+            } catch (error) {
+                console.error("Error updating score:", error);
+            }
+        });
+
+        const endGame = (scores) => {
+            gameActive = false;
+            gameScreen.classList.add('hidden');
+            endScreen.classList.remove('hidden');
+
+            const sortedTeams = Object.keys(scores).filter(k => k.startsWith('Team')).sort((a, b) => scores[b] - scores[a]);
+            const winningTeamId = sortedTeams[0];
+            const winningTeamName = teams[winningTeamId] || '某個';
+
+            winnerMessage.innerHTML = `恭喜 <span class="text-green-400 font-extrabold">${winningTeamName}</span> 隊獲勝，贏得花椰菜！`;
+        };
+
+        restartButton.addEventListener('click', async () => {
+            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
+            try {
+                await setDoc(docRef, {
+                    TeamA: 0,
+                    TeamB: 0,
+                    TeamC: 0,
+                    TeamD: 0,
+                    gameActive: true,
+                    lastReset: Date.now()
+                });
+            } catch (error) {
+                console.error("Error resetting game:", error);
+            }
+            endScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            timerDisplay.innerText = gameDuration;
+            selectedTeam = null;
+            clearInterval(timerId);
+            gameActive = false;
+        });
+
+    </script>
+</body>
+</html>
