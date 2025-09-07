@@ -1,43 +1,71 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Firebase 計分板範例</title>
+  <style>
+    #score {
+      font-size: 2rem;
+      margin-bottom: 20px;
+    }
+    #broccoliIcon {
+      width: 100px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>隊伍 1 分數：<span id="score">0</span></h1>
+  <img id="broccoliIcon" src="https://upload.wikimedia.org/wikipedia/commons/0/03/Broccoli_and_cross_section_edit.jpg" alt="Broccoli">
 
-// Firebase 設定
-const firebaseConfig = {
-  apiKey: "你的 apiKey",
-  authDomain: "你的 authDomain",
-  projectId: "你的 projectId",
-  storageBucket: "你的 storageBucket",
-  messagingSenderId: "你的 senderId",
-  appId: "你的 appId"
-};
+  <!-- Firebase JS SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot, increment, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-// 初始化
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+    // Firebase 配置
+    const firebaseConfig = {
+      apiKey: "你的 apiKey",
+      authDomain: "你的 authDomain",
+      projectId: "你的 projectId",
+      storageBucket: "你的 storageBucket",
+      messagingSenderId: "你的 senderId",
+      appId: "你的 appId"
+    };
 
-// 指定 Firestore 文件 (必須偶數層)
-const appId = "demoApp";   // 這邊換成你在首頁選的隊伍代號
-const docRef = doc(db, "artifacts", appId, "game_data", "game-scores");
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
 
-// 匿名登入
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    await signInAnonymously(auth);
-  }
-});
+    // 指定 Firestore 文件
+    const appId = "demoApp"; // 隊伍代號
+    const docRef = doc(db, "artifacts", appId, "game_data", "game-scores");
 
-// 監聽分數
-onSnapshot(docRef, (snap) => {
-  if (snap.exists()) {
-    const data = snap.data();
-    // 假設這個玩家是 team1
-    document.getElementById("score").textContent = data.team1 ?? 0;
-  }
-});
+    // 匿名登入
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        user = await signInAnonymously(auth);
+      }
 
-// 綁定點擊事件
-document.getElementById("broccoliIcon").addEventListener("click", async () => {
-  await setDoc(docRef, { team1: increment(1) }, { merge: true });
-});
+      // 初始化分數（如果 document 不存在）
+      await setDoc(docRef, { team1: 0 }, { merge: true });
+
+      // 監聽分數變化
+      onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          document.getElementById("score").textContent = data.team1 ?? 0;
+        }
+      });
+
+      // 點擊花椰菜加分
+      document.getElementById("broccoliIcon").addEventListener("click", async () => {
+        await updateDoc(docRef, { team1: increment(1) });
+      });
+    });
+  </script>
+</body>
+</html>
