@@ -3,29 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Firebase 計分板範例</title>
-  <style>
-    #score {
-      font-size: 2rem;
-      margin-bottom: 20px;
-    }
-    #broccoliIcon {
-      width: 100px;
-      cursor: pointer;
-    }
-  </style>
+  <title>Firebase 計分板</title>
 </head>
 <body>
   <h1>隊伍 1 分數：<span id="score">0</span></h1>
-  <img id="broccoliIcon" src="https://upload.wikimedia.org/wikipedia/commons/0/03/Broccoli_and_cross_section_edit.jpg" alt="Broccoli">
+  <img id="broccoliIcon" src="https://upload.wikimedia.org/wikipedia/commons/0/03/Broccoli_and_cross_section_edit.jpg" alt="Broccoli" style="width:100px;cursor:pointer;">
 
-  <!-- Firebase JS SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot, increment, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-    // Firebase 配置
+    // Firebase 設定
     const firebaseConfig = {
       apiKey: "你的 apiKey",
       authDomain: "你的 authDomain",
@@ -35,22 +24,22 @@
       appId: "你的 appId"
     };
 
-    // 初始化 Firebase
+    // 初始化
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // 指定 Firestore 文件
-    const appId = "demoApp"; // 隊伍代號
+    // Firestore 文件路徑
+    const appId = "demoApp";   // 隊伍代號
     const docRef = doc(db, "artifacts", appId, "game_data", "game-scores");
 
-    // 匿名登入
+    // 匿名登入並初始化
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         user = await signInAnonymously(auth);
       }
 
-      // 初始化分數（如果 document 不存在）
+      // 如果 document 不存在，初始化 team1 分數
       await setDoc(docRef, { team1: 0 }, { merge: true });
 
       // 監聽分數變化
@@ -61,8 +50,9 @@
         }
       });
 
-      // 點擊花椰菜加分
-      document.getElementById("broccoliIcon").addEventListener("click", async () => {
+      // 點擊花椰菜增加分數
+      const broccoli = document.getElementById("broccoliIcon");
+      broccoli.addEventListener("click", async () => {
         await updateDoc(docRef, { team1: increment(1) });
       });
     });
