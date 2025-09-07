@@ -2,26 +2,45 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
-  <title>Game Score</title>
+  <title>花椰菜計分遊戲</title>
   <style>
-    body { font-family: sans-serif; }
-    button { margin: 10px; padding: 10px 20px; font-size: 18px; }
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    #game, #scoreboard { display: none; }
+    #broccoliIcon { width: 150px; cursor: pointer; margin: 20px; }
+    button { padding: 10px 20px; margin: 10px; font-size: 18px; }
   </style>
 </head>
 <body>
-  <h1>比賽計分</h1>
-  <p>Team 1 分數: <span id="score1">0</span></p>
-  <p>Team 2 分數: <span id="score2">0</span></p>
-  <button id="team1">+1 Team 1</button>
-  <button id="team2">+1 Team 2</button>
+  <h1>花椰菜計分遊戲</h1>
 
-  <!-- Firebase + App Code -->
+  <!-- 首頁 -->
+  <div id="home">
+    <p>請選擇你的隊伍：</p>
+    <button id="chooseTeam1">Team 1</button>
+    <button id="chooseTeam2">Team 2</button>
+  </div>
+
+  <!-- 遊戲畫面 -->
+  <div id="game">
+    <h2>你正在為 <span id="teamName"></span> 加油！</h2>
+    <img id="broccoliIcon" src="https://upload.wikimedia.org/wikipedia/commons/0/03/Broccoli_and_cross_section_edit.jpg" alt="Broccoli">
+    <p>你的隊伍分數：<span id="myScore">0</span></p>
+  </div>
+
+  <!-- 全部分數 -->
+  <div id="scoreboard">
+    <h2>即時計分板</h2>
+    <p>Team 1 分數：<span id="score1">0</span></p>
+    <p>Team 2 分數：<span id="score2">0</span></p>
+  </div>
+
+  <!-- Firebase + 遊戲程式 -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-    // ✅ 你的 Firebase 設定
+    // ✅ 你的 Firebase 設定 (請換成 Firebase Console 裡的 config)
     const firebaseConfig = {
       apiKey: "你的 apiKey",
       authDomain: "你的 authDomain",
@@ -31,14 +50,13 @@
       appId: "你的 appId"
     };
 
-    // ✅ 初始化
+    // 初始化
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
 
-    // ✅ Firestore 文件路徑 (必須偶數層)
-    const appId = "demoApp"; // 你可以改成真實 id
-    const docRef = doc(db, "artifacts", appId, "game_data", "game-scores");
+    // Firestore 文件
+    const docRef = doc(db, "game_data", "scores"); // ✅ 必須偶數層
 
     // 匿名登入
     onAuthStateChanged(auth, async (user) => {
@@ -47,4 +65,35 @@
       }
     });
 
-    /
+    let myTeam = null; // 使用者所屬隊伍 (team1 / team2)
+
+    // 首頁選隊伍
+    document.getElementById("chooseTeam1").addEventListener("click", () => startGame("team1"));
+    document.getElementById("chooseTeam2").addEventListener("click", () => startGame("team2"));
+
+    function startGame(team) {
+      myTeam = team;
+      document.getElementById("home").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      document.getElementById("scoreboard").style.display = "block";
+      document.getElementById("teamName").textContent = (team === "team1") ? "Team 1" : "Team 2";
+
+      // 監聽 Firestore 分數更新
+      onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          document.getElementById("score1").textContent = data.team1 ?? 0;
+          document.getElementById("score2").textContent = data.team2 ?? 0;
+          document.getElementById("myScore").textContent = data[myTeam] ?? 0;
+        }
+      });
+    }
+
+    // 點擊花椰菜加分
+    document.getElementById("broccoliIcon").addEventListener("click", async () => {
+      if (!myTeam) return; // 還沒選隊伍不做事
+      await setDoc(docRef, { [myTeam]: increment(1) }, { merge: true });
+    });
+  </script>
+</body>
+</html>
