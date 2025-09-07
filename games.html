@@ -18,9 +18,7 @@
             flex-direction: column;
             overflow: hidden;
             user-select: none;
-            -webkit-user-select: none;
         }
-
         .container {
             background-color: rgba(0, 0, 0, 0.4);
             backdrop-filter: blur(10px);
@@ -31,7 +29,6 @@
             width: 90%;
             max-width: 500px;
         }
-
         .broccoli-container {
             width: 100%;
             height: 200px;
@@ -43,26 +40,16 @@
             cursor: pointer;
             animation: pulse 1.5s infinite ease-in-out;
         }
-
         .broccoli-icon {
             font-size: 8rem;
-            animation: bounce 0.5s ease-in-out;
             transform-origin: bottom;
             -webkit-user-select: none;
             user-select: none;
         }
-        
         @keyframes pulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.05); }
         }
-
-        @keyframes bounce {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-
         .score-bubble {
             position: absolute;
             font-size: 2rem;
@@ -72,14 +59,12 @@
             animation: floatup 1s forwards;
             pointer-events: none;
         }
-
         @keyframes floatup {
             to {
                 transform: translateY(-50px);
                 opacity: 1;
             }
         }
-        
         .score-item {
             display: flex;
             justify-content: space-between;
@@ -90,15 +75,11 @@
             margin-bottom: 0.75rem;
             font-weight: 600;
         }
-
         .timer-display {
             font-size: 2.5rem;
             font-weight: bold;
-            letter-spacing: 0.1em;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
             margin-bottom: 1.5rem;
         }
-        
         .team-button {
             transition: transform 0.2s ease-in-out;
         }
@@ -153,22 +134,27 @@
         <!-- 結束畫面 -->
         <div id="end-screen" class="hidden flex-col items-center space-y-6">
             <h2 class="text-4xl font-bold drop-shadow-lg">遊戲結束！</h2>
-            <p id="winner-message" class="text-2xl font-semibold text-center leading-relaxed">恭喜 <span id="winning-team" class="text-green-400"></span> 隊獲勝，贏得花椰菜！</p>
+            <p id="winner-message" class="text-2xl font-semibold text-center leading-relaxed"></p>
             <button id="restart-button" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-transform duration-200">
                 再次挑戰
             </button>
         </div>
-
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables provided by the canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        // Firebase config (需要填入你自己的 Firebase 設定)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
 
         // Firebase initialization
         const app = initializeApp(firebaseConfig);
@@ -178,7 +164,7 @@
         let userId = null;
         let selectedTeam = null;
         let gameActive = false;
-        let gameDuration = 60; // Game duration in seconds
+        let gameDuration = 60;
         let timerId;
 
         // UI elements
@@ -199,30 +185,21 @@
             TeamD: '親友隊'
         };
 
-        // Initialize Firebase Authentication
-        const signIn = async () => {
-            try {
-                await signInAnonymously(auth);
-            } catch (error) {
-                console.error("Firebase Auth failed:", error);
-            }
-        };
+        // Firestore document reference (修正為偶數層)
+        const docRef = doc(db, "game_data", "game-scores");
 
-        auth.onAuthStateChanged(async (user) => {
+        // Firebase Auth
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 userId = user.uid;
-                console.log("Signed in anonymously with user ID:", userId);
                 setupFirestoreListener();
             } else {
-                console.log("Not signed in, attempting anonymous sign in...");
-                await signIn();
+                await signInAnonymously(auth);
             }
         });
 
-        // Setup real-time listener for game scores
+        // Firestore listener
         const setupFirestoreListener = () => {
-            // Fix: Use a valid Firestore document path with an even number of segments
-            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const scores = docSnap.data();
@@ -231,22 +208,17 @@
                         endGame(scores);
                     }
                 } else {
-                    // Initialize game state on first load
+                    // init
                     setDoc(docRef, {
-                        TeamA: 0,
-                        TeamB: 0,
-                        TeamC: 0,
-                        TeamD: 0,
+                        TeamA: 0, TeamB: 0, TeamC: 0, TeamD: 0,
                         gameActive: false,
                         lastReset: Date.now()
                     });
                 }
-            }, (error) => {
-                console.error("Error listening to Firestore document:", error);
             });
         };
 
-        // Update scores on the UI
+        // Update UI scores
         const updateScores = (scores) => {
             for (const teamId in teams) {
                 if (scores.hasOwnProperty(teamId)) {
@@ -255,7 +227,7 @@
             }
         };
 
-        // Start the game timer
+        // Start timer
         const startTimer = () => {
             let timeLeft = gameDuration;
             timerDisplay.innerText = timeLeft;
@@ -267,32 +239,23 @@
                 if (timeLeft <= 0) {
                     clearInterval(timerId);
                     gameActive = false;
-                    // Trigger game end through Firestore update
                     updateGameState(false);
                 }
             }, 1000);
         };
 
-        // Update game state in Firestore
+        // Update game state
         const updateGameState = async (active) => {
-            // Fix: Use a valid Firestore document path with an even number of segments
-            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
-            try {
-                await setDoc(docRef, { gameActive: active }, { merge: true });
-            } catch (error) {
-                console.error("Error updating game state:", error);
-            }
+            await setDoc(docRef, { gameActive: active }, { merge: true });
         };
 
-        // Handle team selection
+        // Team selection
         teamSelection.addEventListener('click', (event) => {
             if (event.target.tagName === 'BUTTON') {
                 selectedTeam = event.target.dataset.team;
                 teamNameDisplay.innerText = `${teams[selectedTeam]}：你的隊伍`;
                 startScreen.classList.add('hidden');
                 gameScreen.classList.remove('hidden');
-                
-                // Start the game timer when a player joins
                 if (!gameActive) {
                     startTimer();
                     updateGameState(true);
@@ -300,74 +263,48 @@
             }
         });
 
-        // Handle click on the broccoli icon
+        // Click broccoli
         broccoliContainer.addEventListener('click', async (event) => {
             if (!gameActive || !selectedTeam) return;
 
-            // Animate the broccoli icon
             const broccoliIcon = document.getElementById('broccoli-icon');
-            broccoliIcon.style.animation = 'none';
-            void broccoliIcon.offsetWidth; // Trigger reflow
-            broccoliIcon.style.animation = 'bounce 0.5s ease-in-out';
+            broccoliIcon.classList.remove("animate-bounce");
+            void broccoliIcon.offsetWidth;
+            broccoliIcon.classList.add("animate-bounce");
 
-            // Create a floating score bubble
             const bubble = document.createElement('div');
             bubble.classList.add('score-bubble');
             bubble.innerText = '+1';
             bubble.style.left = `${event.clientX - broccoliContainer.getBoundingClientRect().left}px`;
             bubble.style.top = `${event.clientY - broccoliContainer.getBoundingClientRect().top}px`;
             broccoliContainer.appendChild(bubble);
+            setTimeout(() => bubble.remove(), 1000);
 
-            setTimeout(() => {
-                bubble.remove();
-            }, 1000);
-
-            // Send score update to Firestore
-            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
-            const teamField = selectedTeam;
-            
             try {
-                const docSnap = await setDoc(docRef, { [teamField]: getScore(teamField) + 1 }, { merge: true });
+                await setDoc(docRef, { [selectedTeam]: increment(1) }, { merge: true });
             } catch (error) {
                 console.error("Error updating score:", error);
             }
         });
 
-        // Get score from UI to prevent multiple rapid reads from firestore
-        const getScore = (teamId) => {
-            return parseInt(document.getElementById(`score-${teamId}`).innerText, 10) || 0;
-        };
-        
-        // End the game and show results
+        // End game
         const endGame = (scores) => {
             gameActive = false;
             gameScreen.classList.add('hidden');
             endScreen.classList.remove('hidden');
-
-            const sortedTeams = Object.keys(scores).filter(key => key.startsWith('Team')).sort((a, b) => scores[b] - scores[a]);
+            const sortedTeams = Object.keys(scores).filter(k => k.startsWith('Team')).sort((a, b) => scores[b] - scores[a]);
             const winningTeamId = sortedTeams[0];
             const winningTeamName = teams[winningTeamId] || '某個';
-
             winnerMessage.innerHTML = `恭喜 <span class="text-green-400 font-extrabold">${winningTeamName}</span> 隊獲勝，贏得花椰菜！`;
         };
 
-        // Restart button
+        // Restart game
         restartButton.addEventListener('click', async () => {
-            // Reset scores in Firestore
-            const docRef = doc(db, `artifacts/${appId}/public/data/game_data/game-scores`);
-            try {
-                await setDoc(docRef, {
-                    TeamA: 0,
-                    TeamB: 0,
-                    TeamC: 0,
-                    TeamD: 0,
-                    gameActive: true,
-                    lastReset: Date.now()
-                });
-            } catch (error) {
-                console.error("Error resetting game:", error);
-            }
-            // Reset UI
+            await setDoc(docRef, {
+                TeamA: 0, TeamB: 0, TeamC: 0, TeamD: 0,
+                gameActive: true,
+                lastReset: Date.now()
+            });
             endScreen.classList.add('hidden');
             startScreen.classList.remove('hidden');
             timerDisplay.innerText = gameDuration;
@@ -375,7 +312,6 @@
             clearInterval(timerId);
             gameActive = false;
         });
-
     </script>
 </body>
 </html>
